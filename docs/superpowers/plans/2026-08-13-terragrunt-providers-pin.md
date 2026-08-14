@@ -440,7 +440,7 @@ import (
 
 func TestListVersions(t *testing.T) {
 	body, _ := os.ReadFile("../../testdata/registry/versions.json")
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/providers/hashicorp/aws/versions" {
 			http.NotFound(w, r)
 			return
@@ -451,9 +451,6 @@ func TestListVersions(t *testing.T) {
 	defer srv.Close()
 
 	addr := ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
-	// Override BaseURL to hit the test server over http.
-	orig := addr.Host
-	_ = orig
 	c := NewClient(srv.Client())
 	got, err := c.ListVersions(context.Background(), addr)
 	if err != nil {
@@ -466,7 +463,7 @@ func TestListVersions(t *testing.T) {
 }
 
 func TestListVersionsHTTPError(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
@@ -601,7 +598,7 @@ git commit -m "feat(registry): list provider versions"
   "arch": "amd64",
   "filename": "terraform-provider-aws_6.0.0_linux_amd64.zip",
   "download_url": "https://releases.example.com/aws/6.0.0/terraform-provider-aws_6.0.0_linux_amd64.zip",
-  "shasums_url": "https://releases.example.com/aws/6.0.0/SHA256SUMS",
+  "shasums_url": "/SHA256SUMS",
   "shasums_signature_url": "https://releases.example.com/aws/6.0.0/SHA256SUMS.sig",
   "shasum": "aaaa",
   "signing_keys": {"gpg_public_keys": []}
@@ -624,7 +621,7 @@ func TestPackageMeta(t *testing.T) {
 	}
 
 	t.Run("packages extension and relative url", func(t *testing.T) {
-		srv := httptest.NewServer(route(pkgBody))
+		srv := httptest.NewTLSServer(route(pkgBody))
 		defer srv.Close()
 		addr := ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 		c := NewClient(srv.Client())
@@ -645,7 +642,7 @@ func TestPackageMeta(t *testing.T) {
 	})
 
 	t.Run("plain response has no packages", func(t *testing.T) {
-		srv := httptest.NewServer(route(plainBody))
+		srv := httptest.NewTLSServer(route(plainBody))
 		defer srv.Close()
 		addr := ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 		c := NewClient(srv.Client())
@@ -924,27 +921,10 @@ import (
 	"testing"
 )
 
-func newMetaServer(t *testing.T, packagesJSON, shasumsBody []byte, shasumsHits *int32) *httptest.Server {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/v1/providers/hashicorp/aws/6.0.0/download/linux/amd64":
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(packagesJSON)
-		case r.URL.Path == "/shasums":
-			atomic.AddInt32(shasumsHits, 1)
-			w.Write(shasumsBody)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	t.Cleanup(srv.Close)
-	return srv
-}
-
 func TestResolverOpenTofuPackages(t *testing.T) {
 	pkg, _ := os.ReadFile("../../testdata/registry/download-packages.json")
 	var metaHits int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt32(&metaHits, 1)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(pkg)
@@ -972,7 +952,7 @@ func TestResolverSHASUMS(t *testing.T) {
 	shasums, _ := os.ReadFile("../../testdata/registry/shasums.txt")
 	// rewrite the plain fixture's shasums_url to point at /shasums on this server
 	var shasumsHits int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/providers/hashicorp/aws/6.0.0/download/linux/amd64":
 			w.Header().Set("Content-Type", "application/json")
@@ -996,7 +976,6 @@ func TestResolverSHASUMS(t *testing.T) {
 	if len(got) != 1 || got[0] != "zh:aaaa" {
 		t.Errorf("got %v, want %v", got, want)
 	}
-	_ = newMetaServer // keep helper referenced if unused later
 }
 ```
 
@@ -1706,7 +1685,7 @@ import (
 )
 
 func newRegServer(t *testing.T, versions, pkg, shasums []byte, metaHits *int32) *httptest.Server {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/providers/hashicorp/aws/versions":
 			w.Header().Set("Content-Type", "application/json")
@@ -1772,21 +1751,19 @@ func TestRunLookupCacheHitsOnceAcrossFiles(t *testing.T) {
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
-	r := registry.NewResolver(client)
-
 	dir := t.TempDir()
 	p1 := filepath.Join(dir, "a.lock.hcl")
 	p2 := filepath.Join(dir, "b.lock.hcl")
 
-	for _, p := range []string{p1, p2} {
-		cfg := Config{Mode: ModeLookup, ProviderRaw: addr.String(), Version: "6.0.0", Platforms: []string{"linux_amd64"}, LockFiles: []string{p}}
-		deps := Deps{Lister: client, Resolver: r, Stdout: &bytes.Buffer{}}
-		if err := Run(context.Background(), cfg, deps); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+	cfg := Config{
+		Mode: ModeLookup, ProviderRaw: addr.String(), Version: "6.0.0",
+		Platforms: []string{"linux_amd64"}, LockFiles: []string{p1, p2},
 	}
-	// Two files, but each Run makes its own Resolver unless shared. Sharing the
-	// resolver across calls is the cache contract: assert it here.
+	deps := Deps{Lister: client, Resolver: registry.NewResolver(client), Stdout: &bytes.Buffer{}}
+	if err := Run(context.Background(), cfg, deps); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Run resolves hashes once before looping over files, so one metadata fetch.
 	if atomic.LoadInt32(&metaHits) != 1 {
 		t.Errorf("expected 1 metadata fetch, got %d", metaHits)
 	}
