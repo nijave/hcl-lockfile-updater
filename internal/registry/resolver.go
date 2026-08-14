@@ -101,7 +101,7 @@ func splitPlatform(p string) (osName, arch string) {
 
 func dedupSort(hashes []string) []string {
 	seen := make(map[string]bool, len(hashes))
-	out := hashes[:0]
+	out := make([]string, 0, len(hashes))
 	for _, h := range hashes {
 		if !seen[h] {
 			seen[h] = true

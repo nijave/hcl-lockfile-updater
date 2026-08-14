@@ -22,6 +22,32 @@ func NewClient(hc *http.Client) *Client {
 	return &Client{httpClient: hc}
 }
 
+// Platform represents one os/arch pair published for a version.
+type Platform struct {
+	OS   string
+	Arch string
+}
+
+// String returns "os_arch".
+func (p Platform) String() string {
+	return p.OS + "_" + p.Arch
+}
+
+// Version holds a version string and its published platforms.
+type Version struct {
+	Version   string
+	Platforms []Platform
+}
+
+// Versions returns the version strings only.
+func Versions(vs []Version) []string {
+	out := make([]string, 0, len(vs))
+	for _, v := range vs {
+		out = append(out, v.Version)
+	}
+	return out
+}
+
 type versionsResponse struct {
 	Versions []struct {
 		Version   string `json:"version"`
@@ -33,8 +59,8 @@ type versionsResponse struct {
 	} `json:"versions"`
 }
 
-// ListVersions returns the raw version strings published for the provider.
-func (c *Client) ListVersions(ctx context.Context, addr ProviderAddr) ([]string, error) {
+// ListVersions returns the published versions with their platforms.
+func (c *Client) ListVersions(ctx context.Context, addr ProviderAddr) ([]Version, error) {
 	u := addr.BaseURL() + "/v1/providers/" + addr.Namespace + "/" + addr.Type + "/versions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
@@ -52,9 +78,13 @@ func (c *Client) ListVersions(ctx context.Context, addr ProviderAddr) ([]string,
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, fmt.Errorf("decoding versions from %s: %w", u, err)
 	}
-	out := make([]string, 0, len(body.Versions))
+	out := make([]Version, 0, len(body.Versions))
 	for _, v := range body.Versions {
-		out = append(out, v.Version)
+		plats := make([]Platform, 0, len(v.Platforms))
+		for _, p := range v.Platforms {
+			plats = append(plats, Platform{OS: p.OS, Arch: p.Arch})
+		}
+		out = append(out, Version{Version: v.Version, Platforms: plats})
 	}
 	return out, nil
 }

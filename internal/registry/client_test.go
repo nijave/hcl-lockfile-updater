@@ -30,9 +30,17 @@ func TestListVersions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := []string{"5.0.0", "6.0.0"}
+	want := []Version{
+		{Version: "5.0.0", Platforms: []Platform{{OS: "linux", Arch: "amd64"}}},
+		{Version: "6.0.0", Platforms: []Platform{{OS: "linux", Arch: "amd64"}, {OS: "darwin", Arch: "arm64"}}},
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
+	}
+	// Verify the Versions helper extracts just the strings.
+	strs := Versions(got)
+	if !reflect.DeepEqual(strs, []string{"5.0.0", "6.0.0"}) {
+		t.Fatalf("Versions() = %v, want [5.0.0 6.0.0]", strs)
 	}
 }
 

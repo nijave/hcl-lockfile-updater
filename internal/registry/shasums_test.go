@@ -34,3 +34,17 @@ func TestParseSHASUMS(t *testing.T) {
 		t.Errorf("got %v, want %v", got2, want2)
 	}
 }
+
+func TestParseSHASUMSNoFalsePositive(t *testing.T) {
+	// linux_arm must NOT match linux_arm64 filenames.
+	body := []byte("aaaa  terraform-provider-aws_6.0.0_linux_arm64.zip\n" +
+		"bbbb  terraform-provider-aws_6.0.0_linux_arm.zip\n")
+	gotArm := ParseSHASUMS(body, []string{"linux_arm"})
+	if len(gotArm) != 1 || gotArm[0] != "zh:bbbb" {
+		t.Errorf("linux_arm matched wrong entries: %v", gotArm)
+	}
+	gotArm64 := ParseSHASUMS(body, []string{"linux_arm64"})
+	if len(gotArm64) != 1 || gotArm64[0] != "zh:aaaa" {
+		t.Errorf("linux_arm64 matched wrong entries: %v", gotArm64)
+	}
+}

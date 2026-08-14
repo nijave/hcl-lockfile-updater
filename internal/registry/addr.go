@@ -70,7 +70,7 @@ func ParseProviderSource(raw string, registryFlag string) (ProviderAddr, error) 
 
 func validateSegment(name, v string) error {
 	if !segmentRe.MatchString(v) {
-		return fmt.Errorf("invalid provider %s %q: must match [A-Za-z0-9_-]+", name, v)
+		return fmt.Errorf("invalid provider %s %q: must start with a letter or digit and otherwise match [A-Za-z0-9_-]", name, v)
 	}
 	return nil
 }

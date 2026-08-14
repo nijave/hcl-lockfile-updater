@@ -43,7 +43,9 @@ func ParseSHASUMS(body []byte, platforms []string) []string {
 
 func matchesPlatform(filename string, want map[string]bool) bool {
 	for token := range want {
-		if strings.Contains(filename, token) {
+		// Require the token to be followed by ".zip" to avoid false positives
+		// (e.g. _linux_arm matching _linux_arm64).
+		if strings.Contains(filename, token+".zip") {
 			return true
 		}
 	}
