@@ -7,6 +7,7 @@ replace github.com/hashicorp/hcl/v2 => github.com/opentofu/hcl/v2 v2.20.2-0.2025
 require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/hashicorp/hcl/v2 v2.20.1
+	github.com/spf13/pflag v1.0.10
 	github.com/zclconf/go-cty v1.13.0
 )
 
@@ -16,7 +17,6 @@ require (
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
-	github.com/spf13/pflag v1.0.10 // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
