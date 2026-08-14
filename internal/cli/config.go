@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/nijave/hcl-lockfile-updater/internal/lockfile"
 	"github.com/spf13/pflag"
 )
 
@@ -27,6 +28,9 @@ type Config struct {
 	Registry    string
 	PrintBlock  bool
 	LockFiles   []string
+	// FormatBlockMode: format the provider block the tool writes (default).
+	// FormatOff: no formatter pass. FormatFile: reformat the entire file.
+	Format lockfile.Format
 }
 
 // ParseArgs parses argv (without the program name) into a Config.
@@ -34,7 +38,7 @@ func ParseArgs(args []string) (Config, error) {
 	fs := pflag.NewFlagSet("hcl-lockfile-updater", pflag.ContinueOnError)
 	var version, constraints, registry, blockFile string
 	var platforms []string
-	var printBlock bool
+	var printBlock, format, reformat bool
 
 	fs.StringVar(&version, "version", "", "exact version to pin")
 	fs.StringArrayVar(&platforms, "platform", nil, "target platform os_arch (repeatable)")
@@ -42,6 +46,8 @@ func ParseArgs(args []string) (Config, error) {
 	fs.StringVar(&registry, "registry", "", "registry host to query")
 	fs.StringVar(&blockFile, "block-file", "", "file containing one provider block (verbatim mode)")
 	fs.BoolVar(&printBlock, "print-block", false, "print the resolved provider block to stdout")
+	fs.BoolVar(&format, "format", true, "run written provider block bytes through the hcl formatter")
+	fs.BoolVar(&reformat, "reformat", false, "reformat the entire lock file (overrides --format)")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
@@ -50,6 +56,15 @@ func ParseArgs(args []string) (Config, error) {
 	cfg := Config{
 		Version: version, Platforms: platforms, Constraints: constraints,
 		Registry: registry, BlockFile: blockFile, PrintBlock: printBlock,
+	}
+	// --reformat takes precedence over --format.
+	switch {
+	case reformat:
+		cfg.Format = lockfile.FormatFile
+	case format:
+		cfg.Format = lockfile.FormatBlock
+	default:
+		cfg.Format = lockfile.FormatOff
 	}
 
 	if blockFile != "" {

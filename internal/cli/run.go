@@ -87,7 +87,7 @@ func Run(ctx context.Context, cfg Config, deps Deps) error {
 	}
 
 	if cfg.PrintBlock {
-		fmt.Fprint(deps.Stdout, string(lockfile.RenderProviderBlock(addr.String(), attrs)))
+		fmt.Fprint(deps.Stdout, string(lockfile.RenderProviderBlock(addr.String(), attrs, cfg.Format)))
 		return nil
 	}
 
@@ -96,7 +96,7 @@ func Run(ctx context.Context, cfg Config, deps Deps) error {
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("reading %s: %w", path, err)
 		}
-		updated, err := lockfile.MergeProviderBlock(existing, addr.String(), attrs)
+		updated, err := lockfile.MergeProviderBlock(existing, addr.String(), attrs, cfg.Format)
 		if err != nil {
 			return fmt.Errorf("updating %s: %w", path, err)
 		}

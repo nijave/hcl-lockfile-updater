@@ -3,6 +3,8 @@ package cli
 import (
 	"runtime"
 	"testing"
+
+	"github.com/nijave/hcl-lockfile-updater/internal/lockfile"
 )
 
 func TestParseArgsLookup(t *testing.T) {
@@ -77,5 +79,46 @@ func TestParseArgsErrors(t *testing.T) {
 func TestParseArgsPrintBlockNoFiles(t *testing.T) {
 	if _, err := ParseArgs([]string{"hashicorp/aws", "--print-block"}); err != nil {
 		t.Fatalf("print-block should allow no files: %v", err)
+	}
+}
+
+func TestParseArgsFormatDefaults(t *testing.T) {
+	cfg, err := ParseArgs([]string{"hashicorp/aws", "a.lock.hcl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Format != lockfile.FormatBlock {
+		t.Errorf("Format default = %v, want FormatBlock", cfg.Format)
+	}
+}
+
+func TestParseArgsFormatOff(t *testing.T) {
+	cfg, err := ParseArgs([]string{"hashicorp/aws", "--format=false", "a.lock.hcl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Format != lockfile.FormatOff {
+		t.Errorf("Format = %v, want FormatOff", cfg.Format)
+	}
+}
+
+func TestParseArgsReformatOverridesFormat(t *testing.T) {
+	// --reformat wins even when --format is explicitly disabled.
+	cfg, err := ParseArgs([]string{"hashicorp/aws", "--format=false", "--reformat", "a.lock.hcl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Format != lockfile.FormatFile {
+		t.Errorf("Format = %v, want FormatFile (--reformat takes precedence)", cfg.Format)
+	}
+}
+
+func TestParseArgsReformatAlone(t *testing.T) {
+	cfg, err := ParseArgs([]string{"hashicorp/aws", "--reformat", "a.lock.hcl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Format != lockfile.FormatFile {
+		t.Errorf("Format = %v, want FormatFile", cfg.Format)
 	}
 }

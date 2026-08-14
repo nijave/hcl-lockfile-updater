@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/nijave/hcl-lockfile-updater/internal/lockfile"
 	"github.com/nijave/hcl-lockfile-updater/internal/registry"
 )
 
@@ -376,5 +377,64 @@ func TestRunVerbatimPrintBlock(t *testing.T) {
 	// Must end with exactly one newline.
 	if !strings.HasSuffix(printed, "\n") || strings.HasSuffix(printed, "\n\n") {
 		t.Errorf("verbatim --print-block trailing newline wrong")
+	}
+}
+
+func TestRunLookupFormatOffPreservesFile(t *testing.T) {
+	var metaHits int32
+	srv := newRegServer(t,
+		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa","h1:bbb="]}}}`),
+		nil, &metaHits)
+	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
+	client := registry.NewClient(srv.Client())
+
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, ".terraform.lock.hcl")
+	os.WriteFile(lockPath, []byte("# managed by tooling\nprovider \""+addr.String()+"\" {\n  version=\"5.0.0\"\n  constraints   =   \"~> 5.0\"\n}\n"), 0o644)
+
+	cfg := Config{
+		Mode: ModeLookup, ProviderRaw: addr.String(), Version: "6.0.0",
+		Platforms: []string{"linux_amd64"}, LockFiles: []string{lockPath},
+		Format: lockfile.FormatOff,
+	}
+	deps := Deps{Lister: client, Resolver: registry.NewResolver(client), Stdout: &bytes.Buffer{}}
+	if err := Run(context.Background(), cfg, deps); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := os.ReadFile(lockPath)
+	// The resolver dedup-sorts hashes, so expect its sorted order.
+	want := "# managed by tooling\nprovider \"" + addr.String() + "\" {\n  version = \"6.0.0\"\n  constraints   =   \"~> 5.0\"\n  hashes = [\"h1:bbb=\", \"zh:aaa\"]\n}\n"
+	if string(got) != want {
+		t.Errorf("format-off file wrong.\nwant:\n%s\ngot:\n%s", want, string(got))
+	}
+}
+
+func TestRunLookupReformatReformatsFile(t *testing.T) {
+	var metaHits int32
+	srv := newRegServer(t,
+		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa"]}}}`),
+		nil, &metaHits)
+	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
+	client := registry.NewClient(srv.Client())
+
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, ".terraform.lock.hcl")
+	os.WriteFile(lockPath, []byte("# managed by tooling\nprovider \""+addr.String()+"\" {\n  version=\"5.0.0\"\n  constraints   =   \"~> 5.0\"\n}\n"), 0o644)
+
+	cfg := Config{
+		Mode: ModeLookup, ProviderRaw: addr.String(), Version: "6.0.0",
+		Platforms: []string{"linux_amd64"}, LockFiles: []string{lockPath},
+		Format: lockfile.FormatFile,
+	}
+	deps := Deps{Lister: client, Resolver: registry.NewResolver(client), Stdout: &bytes.Buffer{}}
+	if err := Run(context.Background(), cfg, deps); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := os.ReadFile(lockPath)
+	want := "# managed by tooling\nprovider \"" + addr.String() + "\" {\n  version     = \"6.0.0\"\n  constraints = \"~> 5.0\"\n  hashes      = [\"zh:aaa\"]\n}\n"
+	if string(got) != want {
+		t.Errorf("reformat file wrong.\nwant:\n%s\ngot:\n%s", want, string(got))
 	}
 }

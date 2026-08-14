@@ -37,11 +37,17 @@ Verbatim mode applies a hand-written block:
 | `--registry` | `registry.opentofu.org` | registry host to query |
 | `--block-file` | | verbatim mode: file with one `provider {}` block |
 | `--print-block` | false | print the resolved block and exit |
+| `--format` | true | run the written provider block through the hcl formatter |
+| `--reformat` | false | reformat the entire lock file (overrides `--format`) |
 
 ## Behavior
 
 - The tool preserves attributes it does not set. A lookup run leaves an
   existing `constraints` untouched unless you pass `--constraints`.
+- Formatting scopes to the provider block the tool writes: `--format` (the
+  default) runs that block through the hcl formatter while the rest of the
+  file keeps its bytes. `--format=false` skips the formatter entirely, and
+  `--reformat` normalizes the whole file through the formatter.
 - The OpenTofu registry supplies `h1:` and `zh:` hashes directly (one call). For
   registries without that extension (the HashiCorp registry), the tool emits
   `zh:` hashes from the signed SHASUMS document only.
