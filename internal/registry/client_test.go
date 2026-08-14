@@ -5,11 +5,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"testing"
 )
 
 func TestListVersions(t *testing.T) {
-	body, _ := os.ReadFile("../../testdata/registry/versions.json")
+	body, err := os.ReadFile("../../testdata/registry/versions.json")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/providers/hashicorp/aws/versions" {
 			http.NotFound(w, r)
@@ -27,7 +31,7 @@ func TestListVersions(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	want := []string{"5.0.0", "6.0.0"}
-	if len(got) != len(want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
