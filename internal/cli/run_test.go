@@ -119,6 +119,82 @@ func TestRunPrintBlock(t *testing.T) {
 	}
 }
 
+func TestRunPrintBlockLeavesLockFileUnchanged(t *testing.T) {
+	orig := []byte(`provider "registry.opentofu.org/hashicorp/aws" {
+  version     = "5.0.0"
+  constraints = "~> 5.0"
+  hashes = ["h1:old="]
+}
+`)
+	var metaHits int32
+	srv := newRegServer(t,
+		[]byte(`{"versions":[{"version":"6.0.0"}]}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa","h1:bbb="]}}}`),
+		nil, &metaHits)
+	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
+	client := registry.NewClient(srv.Client())
+
+	dir := t.TempDir()
+	lockPath := filepath.Join(dir, ".terraform.lock.hcl")
+	if err := os.WriteFile(lockPath, orig, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{
+		Mode: ModeLookup, ProviderRaw: addr.String(), Version: "6.0.0",
+		Platforms: []string{"linux_amd64"}, PrintBlock: true,
+		LockFiles: []string{lockPath},
+	}
+	out := &bytes.Buffer{}
+	deps := Deps{Lister: client, Resolver: registry.NewResolver(client), Stdout: out}
+	if err := Run(context.Background(), cfg, deps); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// PrintBlock short-circuits before the write loop, so stdout should have content
+	if out.Len() == 0 {
+		t.Fatal("expected non-empty stdout from --print-block")
+	}
+	// The lock file on disk must be byte-for-byte unchanged
+	got, err := os.ReadFile(lockPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, orig) {
+		t.Errorf("lock file was modified:\n%s", string(got))
+	}
+}
+
+func TestRunVerbatimConstraintsOverride(t *testing.T) {
+	dir := t.TempDir()
+	blockPath := filepath.Join(dir, "block.hcl")
+	os.WriteFile(blockPath, []byte(`provider "registry.opentofu.org/cloudflare/cloudflare" {
+  version     = "5.22.0"
+  constraints = "5.22.0"
+  hashes = ["zh:aaaa"]
+}
+`), 0o644)
+	lockPath := filepath.Join(dir, ".terraform.lock.hcl")
+	os.WriteFile(lockPath, []byte(`provider "registry.opentofu.org/cloudflare/cloudflare" {
+  version = "5.20.0"
+  hashes  = ["zh:old"]
+}
+`), 0o644)
+
+	cfg := Config{Mode: ModeVerbatim, BlockFile: blockPath, Constraints: "5.99.0", LockFiles: []string{lockPath}}
+	deps := Deps{Stdout: &bytes.Buffer{}}
+	if err := Run(context.Background(), cfg, deps); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, _ := os.ReadFile(lockPath)
+	s := string(got)
+	if !strings.Contains(s, `constraints = "5.99.0"`) {
+		t.Errorf("override constraints not applied:\n%s", s)
+	}
+	if strings.Contains(s, `constraints = "5.22.0"`) {
+		t.Errorf("block's original constraints should have been overridden:\n%s", s)
+	}
+}
+
 func TestRunVerbatim(t *testing.T) {
 	dir := t.TempDir()
 	blockPath := filepath.Join(dir, "block.hcl")
