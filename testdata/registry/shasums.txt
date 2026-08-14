@@ -1,0 +1,3 @@
+aaaa  terraform-provider-aws_6.0.0_linux_amd64.zip
+bbbb  terraform-provider-aws_6.0.0_darwin_arm64.zip
+cccc  terraform-provider-aws_6.0.0_windows_amd64.zip
