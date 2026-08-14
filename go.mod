@@ -1,4 +1,4 @@
-module github.com/nijave/terragrunt-providers-pin
+module github.com/nijave/hcl-lockfile-updater
 
 go 1.25.12
 

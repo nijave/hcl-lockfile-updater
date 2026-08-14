@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/nijave/terragrunt-providers-pin/internal/lockfile"
-	"github.com/nijave/terragrunt-providers-pin/internal/registry"
+	"github.com/nijave/hcl-lockfile-updater/internal/lockfile"
+	"github.com/nijave/hcl-lockfile-updater/internal/registry"
 )
 
 // Lister lists provider versions with their platforms.

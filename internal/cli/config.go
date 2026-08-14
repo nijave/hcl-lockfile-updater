@@ -31,7 +31,7 @@ type Config struct {
 
 // ParseArgs parses argv (without the program name) into a Config.
 func ParseArgs(args []string) (Config, error) {
-	fs := pflag.NewFlagSet("terragrunt-providers-pin", pflag.ContinueOnError)
+	fs := pflag.NewFlagSet("hcl-lockfile-updater", pflag.ContinueOnError)
 	var version, constraints, registry, blockFile string
 	var platforms []string
 	var printBlock bool

@@ -1,6 +1,6 @@
 .superpowers/
 
-/terragrunt-providers-pin
-/terragrunt-providers-pin.exe
+/hcl-lockfile-updater
+/hcl-lockfile-updater.exe
 *.out
 *.test

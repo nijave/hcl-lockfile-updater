@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nijave/terragrunt-providers-pin/internal/cli"
-	"github.com/nijave/terragrunt-providers-pin/internal/registry"
+	"github.com/nijave/hcl-lockfile-updater/internal/cli"
+	"github.com/nijave/hcl-lockfile-updater/internal/registry"
 )
 
 func main() {

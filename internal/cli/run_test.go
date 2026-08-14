@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/nijave/terragrunt-providers-pin/internal/registry"
+	"github.com/nijave/hcl-lockfile-updater/internal/registry"
 )
 
 func newRegServer(t *testing.T, versions, pkg, shasums []byte, metaHits *int32) *httptest.Server {

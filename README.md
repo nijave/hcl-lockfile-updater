@@ -1,4 +1,4 @@
-# terragrunt-providers-pin
+# hcl-lockfile-updater
 
 Pin a provider (source address, version, and checksum hashes) into one or more
 `.terraform.lock.hcl` files, like `tofu providers lock` but driven by explicit
@@ -6,26 +6,26 @@ arguments instead of a configuration tree.
 
 ## Install
 
-    go install github.com/nijave/terragrunt-providers-pin@latest
+    go install github.com/nijave/hcl-lockfile-updater@latest
 
 ## Usage
 
-    terragrunt-providers-pin [--block-file FILE | PROVIDER_SOURCE] [flags] LOCKFILE...
+    hcl-lockfile-updater [--block-file FILE | PROVIDER_SOURCE] [flags] LOCKFILE...
 
 Lookup mode resolves hashes from the provider registry:
 
-    terragrunt-providers-pin registry.opentofu.org/hashicorp/aws \
+    hcl-lockfile-updater registry.opentofu.org/hashicorp/aws \
         --version 6.0.0 --platform linux_amd64 --platform darwin_arm64 \
         .terraform.lock.hcl envs/dev/.terraform.lock.hcl
 
 Generate a verbatim block and save it:
 
-    terragrunt-providers-pin registry.opentofu.org/hashicorp/aws \
+    hcl-lockfile-updater registry.opentofu.org/hashicorp/aws \
         --version 6.0.0 --platform linux_amd64 --print-block > aws.lock.hcl
 
 Verbatim mode applies a hand-written block:
 
-    terragrunt-providers-pin --block-file aws.lock.hcl .terraform.lock.hcl
+    hcl-lockfile-updater --block-file aws.lock.hcl .terraform.lock.hcl
 
 ### Flags
 
@@ -49,4 +49,4 @@ Verbatim mode applies a hand-written block:
 
 ## License
 
-MPL-2.0.
+Apache-2.0.
