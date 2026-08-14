@@ -19,8 +19,8 @@ const (
 // Config is the parsed CLI configuration.
 type Config struct {
 	Mode        Mode
-	BlockFile   string   // verbatim mode
-	ProviderRaw string   // lookup mode raw address
+	BlockFile   string // verbatim mode
+	ProviderRaw string // lookup mode raw address
 	Version     string
 	Platforms   []string
 	Constraints string

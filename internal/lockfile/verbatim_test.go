@@ -33,12 +33,12 @@ func TestDecodeVerbatimBlock(t *testing.T) {
 
 func TestDecodeVerbatimBlockErrors(t *testing.T) {
 	cases := map[string]string{
-		"no provider block":    `terraform { required_version = ">= 1.0" }`,
-		"two provider blocks":  `provider "a/b/c" { version = "1.0.0" hashes = ["zh:1"] }
+		"no provider block": `terraform { required_version = ">= 1.0" }`,
+		"two provider blocks": `provider "a/b/c" { version = "1.0.0" hashes = ["zh:1"] }
 provider "x/y/z" { version = "1.0.0" hashes = ["zh:2"] }`,
-		"missing version":      `provider "a/b/c" { hashes = ["zh:1"] }`,
-		"missing hashes":       `provider "a/b/c" { version = "1.0.0" }`,
-		"malformed hcl":        `provider "a/b/c" { version = `,
+		"missing version": `provider "a/b/c" { hashes = ["zh:1"] }`,
+		"missing hashes":  `provider "a/b/c" { version = "1.0.0" }`,
+		"malformed hcl":   `provider "a/b/c" { version = `,
 	}
 	for name, src := range cases {
 		t.Run(name, func(t *testing.T) {
