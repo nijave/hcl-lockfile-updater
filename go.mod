@@ -5,8 +5,10 @@ go 1.25.12
 require (
 	github.com/hashicorp/go-version v1.9.0
 	github.com/spf13/pflag v1.0.10
-	github.com/zclconf/go-cty v1.16.3
+	github.com/zclconf/go-cty v1.19.0
 )
+
+require github.com/apparentlymart/go-textseg/v17 v17.0.1 // indirect
 
 require (
 	github.com/agext/levenshtein v1.2.1 // indirect
