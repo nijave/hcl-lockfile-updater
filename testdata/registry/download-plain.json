@@ -1,0 +1,11 @@
+{
+  "protocols": ["5.0"],
+  "os": "linux",
+  "arch": "amd64",
+  "filename": "terraform-provider-aws_6.0.0_linux_amd64.zip",
+  "download_url": "https://releases.example.com/aws/6.0.0/terraform-provider-aws_6.0.0_linux_amd64.zip",
+  "shasums_url": "/SHA256SUMS",
+  "shasums_signature_url": "https://releases.example.com/aws/6.0.0/SHA256SUMS.sig",
+  "shasum": "aaaa",
+  "signing_keys": {"gpg_public_keys": []}
+}

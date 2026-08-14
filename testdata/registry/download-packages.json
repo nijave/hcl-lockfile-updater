@@ -1,0 +1,15 @@
+{
+  "protocols": ["5.0"],
+  "os": "linux",
+  "arch": "amd64",
+  "filename": "terraform-provider-aws_6.0.0_linux_amd64.zip",
+  "download_url": "https://example.com/aws/6.0.0/terraform-provider-aws_6.0.0_linux_amd64.zip",
+  "shasums_url": "/v1/providers/hashicorp/aws/6.0.0/shasums",
+  "shasums_signature_url": "/v1/providers/hashicorp/aws/6.0.0/shasums.sig",
+  "shasum": "aaaa",
+  "signing_keys": {"gpg_public_keys": []},
+  "packages": {
+    "linux_amd64": {"hashes": ["zh:94b25024bfc5c37d725c6cb21b3ae3c2dc8fea9fcce10b0cf272e60bae464dc3", "h1:o2/NmQSjFp/wbXAzs7FUgjNTgjGAmUe/MPHhST8lMtA="], "package_size": 100},
+    "darwin_arm64": {"hashes": ["zh:abcdef", "h1:bbbb"], "package_size": 90}
+  }
+}
