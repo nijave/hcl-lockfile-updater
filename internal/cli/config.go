@@ -31,6 +31,9 @@ type Config struct {
 	// FormatBlockMode: format the provider block the tool writes (default).
 	// FormatOff: no formatter pass. FormatFile: reformat the entire file.
 	Format lockfile.Format
+	// SkipMissing: only update lock files that already contain a matching
+	// provider block. Missing files and files without the block are skipped.
+	SkipMissing bool
 }
 
 // ParseArgs parses argv (without the program name) into a Config.
@@ -38,7 +41,7 @@ func ParseArgs(args []string) (Config, error) {
 	fs := pflag.NewFlagSet("hcl-lockfile-updater", pflag.ContinueOnError)
 	var version, constraints, registry, blockFile string
 	var platforms []string
-	var printBlock, format, reformat bool
+	var printBlock, format, reformat, skipMissing bool
 
 	fs.StringVar(&version, "version", "", "exact version to pin")
 	fs.StringArrayVar(&platforms, "platform", nil, "target platform os_arch (repeatable)")
@@ -48,6 +51,7 @@ func ParseArgs(args []string) (Config, error) {
 	fs.BoolVar(&printBlock, "print-block", false, "print the resolved provider block to stdout")
 	fs.BoolVar(&format, "format", true, "run written provider block bytes through the hcl formatter")
 	fs.BoolVar(&reformat, "reformat", false, "reformat the entire lock file (overrides --format)")
+	fs.BoolVar(&skipMissing, "skip-missing", false, "only update lock files that already contain the provider block")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
@@ -56,6 +60,7 @@ func ParseArgs(args []string) (Config, error) {
 	cfg := Config{
 		Version: version, Platforms: platforms, Constraints: constraints,
 		Registry: registry, BlockFile: blockFile, PrintBlock: printBlock,
+		SkipMissing: skipMissing,
 	}
 	// --reformat takes precedence over --format.
 	switch {

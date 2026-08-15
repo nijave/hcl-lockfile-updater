@@ -254,6 +254,16 @@ func formatBlockOnly(data []byte, addr string) ([]byte, error) {
 	return out, nil
 }
 
+// HasProviderBlock reports whether data contains a provider block for addr.
+// A parse failure is reported as an error.
+func HasProviderBlock(data []byte, addr string) (bool, error) {
+	blk, err := locateSyntaxBlock(data, addr)
+	if err != nil {
+		return false, err
+	}
+	return blk != nil, nil
+}
+
 func locateSyntaxBlock(data []byte, addr string) (*hclsyntax.Block, error) {
 	f, diags := hclsyntax.ParseConfig(data, ".terraform.lock.hcl", hcl.InitialPos)
 	if diags.HasErrors() {

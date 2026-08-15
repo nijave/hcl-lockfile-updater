@@ -222,6 +222,25 @@ func TestRenderProviderBlockPlain(t *testing.T) {
 	}
 }
 
+func TestHasProviderBlock(t *testing.T) {
+	data := []byte(`provider "a.example.com/x/present" {
+  version = "1.0.0"
+}
+`)
+	if ok, err := HasProviderBlock(data, "a.example.com/x/present"); err != nil || !ok {
+		t.Errorf("present block: ok=%v err=%v, want true nil", ok, err)
+	}
+	if ok, err := HasProviderBlock(data, "a.example.com/x/absent"); err != nil || ok {
+		t.Errorf("absent block: ok=%v err=%v, want false nil", ok, err)
+	}
+	if ok, err := HasProviderBlock([]byte(""), "a.example.com/x/y"); err != nil || ok {
+		t.Errorf("empty data: ok=%v err=%v, want false nil", ok, err)
+	}
+	if _, err := HasProviderBlock([]byte("provider {"), "a.example.com/x/y"); err == nil {
+		t.Errorf("malformed data: want parse error")
+	}
+}
+
 func TestMergeProviderBlockAppendsNewAndPreservesOthers(t *testing.T) {
 	existing := []byte(`# top comment
 provider "registry.opentofu.org/hashicorp/random" {

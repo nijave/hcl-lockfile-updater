@@ -96,6 +96,16 @@ func Run(ctx context.Context, cfg Config, deps Deps) error {
 		if err != nil && !os.IsNotExist(err) {
 			return fmt.Errorf("reading %s: %w", path, err)
 		}
+		if cfg.SkipMissing {
+			// Update only files that already pin this provider.
+			has, err := lockfile.HasProviderBlock(existing, addr.String())
+			if err != nil {
+				return fmt.Errorf("checking %s: %w", path, err)
+			}
+			if !has {
+				continue
+			}
+		}
 		updated, err := lockfile.MergeProviderBlock(existing, addr.String(), attrs, cfg.Format)
 		if err != nil {
 			return fmt.Errorf("updating %s: %w", path, err)

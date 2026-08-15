@@ -39,6 +39,7 @@ Verbatim mode applies a hand-written block:
 | `--print-block` | false | print the resolved block and exit |
 | `--format` | true | run the written provider block through the hcl formatter |
 | `--reformat` | false | reformat the entire lock file (overrides `--format`) |
+| `--skip-missing` | false | only update lock files that already pin the provider |
 
 ## Behavior
 

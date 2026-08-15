@@ -122,3 +122,20 @@ func TestParseArgsReformatAlone(t *testing.T) {
 		t.Errorf("Format = %v, want FormatFile", cfg.Format)
 	}
 }
+
+func TestParseArgsSkipMissing(t *testing.T) {
+	cfg, err := ParseArgs([]string{"hashicorp/aws", "--skip-missing", "a.lock.hcl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !cfg.SkipMissing {
+		t.Errorf("SkipMissing = false, want true")
+	}
+	cfg, err = ParseArgs([]string{"hashicorp/aws", "a.lock.hcl"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.SkipMissing {
+		t.Errorf("SkipMissing default = true, want false")
+	}
+}

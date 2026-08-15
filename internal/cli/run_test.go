@@ -438,3 +438,80 @@ func TestRunLookupReformatReformatsFile(t *testing.T) {
 		t.Errorf("reformat file wrong.\nwant:\n%s\ngot:\n%s", want, string(got))
 	}
 }
+
+func TestRunLookupSkipMissing(t *testing.T) {
+	var metaHits int32
+	srv := newRegServer(t,
+		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa"]}}}`),
+		nil, &metaHits)
+	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
+	client := registry.NewClient(srv.Client())
+
+	dir := t.TempDir()
+	absent := filepath.Join(dir, "does-not-exist.lock.hcl")
+	otherProvider := filepath.Join(dir, "other.hcl")
+	os.WriteFile(otherProvider, []byte(`provider "registry.opentofu.org/hashicorp/random" {
+  version = "3.0.0"
+}
+`), 0o644)
+	present := filepath.Join(dir, "present.hcl")
+	presentOrig := []byte(`provider "` + addr.String() + `" {
+  version = "5.0.0"
+}
+`)
+	os.WriteFile(present, presentOrig, 0o644)
+
+	cfg := Config{
+		Mode: ModeLookup, ProviderRaw: addr.String(), Version: "6.0.0",
+		Platforms:   []string{"linux_amd64"},
+		LockFiles:   []string{absent, otherProvider, present},
+		SkipMissing: true,
+	}
+	deps := Deps{Lister: client, Resolver: registry.NewResolver(client), Stdout: &bytes.Buffer{}}
+	if err := Run(context.Background(), cfg, deps); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(absent); !os.IsNotExist(err) {
+		t.Errorf("missing file was created despite --skip-missing")
+	}
+	otherGot, _ := os.ReadFile(otherProvider)
+	if !strings.Contains(string(otherGot), `"3.0.0"`) {
+		t.Errorf("file without matching block was modified:\n%s", string(otherGot))
+	}
+	got, _ := os.ReadFile(present)
+	if !strings.Contains(string(got), `"6.0.0"`) || strings.Contains(string(got), `"5.0.0"`) {
+		t.Errorf("matching file not updated:\n%s", string(got))
+	}
+}
+
+func TestRunVerbatimSkipMissing(t *testing.T) {
+	dir := t.TempDir()
+	blockPath := filepath.Join(dir, "block.hcl")
+	os.WriteFile(blockPath, []byte(`provider "registry.opentofu.org/cloudflare/cloudflare" {
+  version = "5.22.0"
+  hashes  = ["zh:aaaa"]
+}
+`), 0o644)
+
+	noMatch := filepath.Join(dir, "no-match.hcl")
+	orig := []byte(`provider "registry.opentofu.org/hashicorp/aws" {
+  version = "5.0.0"
+}
+`)
+	os.WriteFile(noMatch, orig, 0o644)
+
+	cfg := Config{Mode: ModeVerbatim, BlockFile: blockPath, LockFiles: []string{noMatch}, SkipMissing: true}
+	deps := Deps{Stdout: &bytes.Buffer{}}
+	if err := Run(context.Background(), cfg, deps); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got, err := os.ReadFile(noMatch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, orig) {
+		t.Errorf("file without matching block was modified:\n%s", string(got))
+	}
+}
