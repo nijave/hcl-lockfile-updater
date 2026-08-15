@@ -76,7 +76,7 @@ func Run(ctx context.Context, cfg Config, deps Deps) error {
 			return err
 		}
 		// Validate that every requested platform is available for the chosen version.
-		if err := validatePlatforms(cfg.Platforms, version, allVersions); err != nil {
+		if err := validatePlatforms(cfg.Platforms, addr, version, allVersions); err != nil {
 			return err
 		}
 		hashes, err := deps.Resolver.Hashes(ctx, addr, version, cfg.Platforms)
@@ -119,7 +119,7 @@ func Run(ctx context.Context, cfg Config, deps Deps) error {
 
 // validatePlatforms checks that every requested platform token is published
 // for the chosen version.
-func validatePlatforms(platforms []string, version string, allVersions []registry.Version) error {
+func validatePlatforms(platforms []string, addr registry.ProviderAddr, version string, allVersions []registry.Version) error {
 	var ver *registry.Version
 	for i := range allVersions {
 		if allVersions[i].Version == version {
@@ -141,7 +141,7 @@ func validatePlatforms(platforms []string, version string, allVersions []registr
 				plats = append(plats, p.String())
 			}
 			sort.Strings(plats)
-			return fmt.Errorf("platform %q not available for %s %s; available: %s", plat, ver.Version, "", strings.Join(plats, ", "))
+			return fmt.Errorf("platform %q not available for %s %s; available: %s", plat, addr.String(), ver.Version, strings.Join(plats, ", "))
 		}
 	}
 	return nil

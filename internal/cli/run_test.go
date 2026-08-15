@@ -326,6 +326,12 @@ func TestRunLookupPlatformNotAvailable(t *testing.T) {
 	if !strings.Contains(err.Error(), `platform "darwin_arm64" not available`) {
 		t.Errorf("error missing platform detail: %v", err)
 	}
+	if !strings.Contains(err.Error(), addr.String()) {
+		t.Errorf("error missing provider address: %v", err)
+	}
+	if !strings.Contains(err.Error(), "6.0.0") {
+		t.Errorf("error missing version: %v", err)
+	}
 	if !strings.Contains(err.Error(), "linux_amd64") {
 		t.Errorf("error missing available platforms: %v", err)
 	}

@@ -1,13 +1,42 @@
 package registry
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+// A nil client must fall back to one with a bounded timeout so a wedged
+// registry connection cannot hang the tool indefinitely.
+func TestNewClientDefaultHasTimeout(t *testing.T) {
+	c := NewClient(nil)
+	if c.httpClient.Timeout <= 0 {
+		t.Errorf("default client Timeout = %v, want > 0", c.httpClient.Timeout)
+	}
+}
+
+// A SHASUMS document beyond the size cap is rejected rather than read into
+// memory unbounded.
+func TestFetchSHASUMSRejectsOversizedBody(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(bytes.Repeat([]byte("a"), maxSHASUMSSize+1))
+	}))
+	defer srv.Close()
+
+	c := NewClient(srv.Client())
+	_, err := c.FetchSHASUMS(context.Background(), srv.URL)
+	if err == nil {
+		t.Fatal("expected error for oversized SHASUMS body")
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("error should name the size violation: %v", err)
+	}
+}
 
 func TestListVersions(t *testing.T) {
 	body, err := os.ReadFile("../../testdata/registry/versions.json")

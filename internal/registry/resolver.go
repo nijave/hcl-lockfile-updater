@@ -32,20 +32,26 @@ func (r *Resolver) Hashes(ctx context.Context, addr ProviderAddr, version string
 		return nil, fmt.Errorf("no platforms requested")
 	}
 	key := addr.Host + "/" + addr.Namespace + "/" + addr.Type + "@" + version
+	// The lock is held across the fetch so concurrent callers block on it and
+	// then hit the cache instead of racing to duplicate the registry request.
+	// That serializes lookups for different keys too, which is fine at the
+	// scale this CLI runs at.
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	c, ok := r.cache[key]
-	r.mu.Unlock()
 	if !ok {
 		var err error
 		c, err = r.fetch(ctx, addr, version, platforms[0])
 		if err != nil {
 			return nil, err
 		}
-		r.mu.Lock()
 		r.cache[key] = c
-		r.mu.Unlock()
 	}
-	return dedupSort(c.hashesFor(platforms)), nil
+	hashes, err := c.hashesFor(platforms)
+	if err != nil {
+		return nil, err
+	}
+	return dedupSort(hashes), nil
 }
 
 func (r *Resolver) fetch(ctx context.Context, addr ProviderAddr, version, firstPlatform string) (cachedHashes, error) {
@@ -71,24 +77,32 @@ func (r *Resolver) fetch(ctx context.Context, addr ProviderAddr, version, firstP
 	return cachedHashes{shasumLines: ParseSHASUMSLines(body)}, nil
 }
 
-func (c cachedHashes) hashesFor(platforms []string) []string {
+func (c cachedHashes) hashesFor(platforms []string) ([]string, error) {
 	var out []string
 	if c.byPlatform != nil {
 		for _, p := range platforms {
-			out = append(out, c.byPlatform[p]...)
+			hashes, ok := c.byPlatform[p]
+			if !ok {
+				return nil, fmt.Errorf("platform %q not present in registry packages response", p)
+			}
+			out = append(out, hashes...)
 		}
 	} else {
-		want := make(map[string]bool, len(platforms))
 		for _, p := range platforms {
-			want["_"+p] = true
-		}
-		for _, ln := range c.shasumLines {
-			if matchesPlatform(ln.Filename, want) {
-				out = append(out, "zh:"+ln.Hex)
+			want := map[string]bool{"_" + p: true}
+			found := false
+			for _, ln := range c.shasumLines {
+				if matchesPlatform(ln.Filename, want) {
+					out = append(out, "zh:"+ln.Hex)
+					found = true
+				}
+			}
+			if !found {
+				return nil, fmt.Errorf("platform %q not present in SHASUMS document", p)
 			}
 		}
 	}
-	return out
+	return out, nil
 }
 
 func splitPlatform(p string) (osName, arch string) {

@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"errors"
 	"runtime"
 	"testing"
 
 	"github.com/nijave/hcl-lockfile-updater/internal/lockfile"
+	"github.com/spf13/pflag"
 )
 
 func TestParseArgsLookup(t *testing.T) {
@@ -73,6 +75,16 @@ func TestParseArgsErrors(t *testing.T) {
 				t.Error("expected error, got nil")
 			}
 		})
+	}
+}
+
+// main exits 0 on pflag.ErrHelp, so ParseArgs must keep reporting help
+// through that sentinel rather than wrapping or replacing it.
+func TestParseArgsHelpReportsErrHelp(t *testing.T) {
+	for _, args := range [][]string{{"--help"}, {"-h"}} {
+		if _, err := ParseArgs(args); !errors.Is(err, pflag.ErrHelp) {
+			t.Errorf("ParseArgs(%v) error = %v, want pflag.ErrHelp", args, err)
+		}
 	}
 }
 

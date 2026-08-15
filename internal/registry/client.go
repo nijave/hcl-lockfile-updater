@@ -7,17 +7,23 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
+
+// defaultTimeout bounds each registry request when the caller does not
+// supply an http.Client.
+const defaultTimeout = 60 * time.Second
 
 // Client talks the providers.v1 registry protocol over HTTPS.
 type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient returns a registry client. If hc is nil, http.DefaultClient is used.
+// NewClient returns a registry client. If hc is nil, a client with a
+// 60-second per-request timeout is used.
 func NewClient(hc *http.Client) *Client {
 	if hc == nil {
-		hc = http.DefaultClient
+		hc = &http.Client{Timeout: defaultTimeout}
 	}
 	return &Client{httpClient: hc}
 }
@@ -132,7 +138,16 @@ func (c *Client) PackageMeta(ctx context.Context, addr ProviderAddr, version, os
 	return &meta, nil
 }
 
+// maxSHASUMSSize caps how large a SHASUMS response may be. Real documents are
+// a few KB; anything larger is a broken or hostile registry.
+const maxSHASUMSSize = 1 << 20
+
 // FetchSHASUMS downloads the signed SHASUMS document at urlStr.
+//
+// The URL comes from the registry's download response and is fetched as given:
+// the registry is trusted here, the same trust boundary `terraform providers
+// lock` applies. Same-origin pinning would reject legitimate hosts (the
+// download endpoint redirects to a release CDN before this URL is resolved).
 func (c *Client) FetchSHASUMS(ctx context.Context, urlStr string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
@@ -146,7 +161,14 @@ func (c *Client) FetchSHASUMS(ctx context.Context, urlStr string) ([]byte, error
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetching shasums %s: %s", urlStr, resp.Status)
 	}
-	return io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSHASUMSSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxSHASUMSSize {
+		return nil, fmt.Errorf("shasums document %s exceeds %d bytes", urlStr, maxSHASUMSSize)
+	}
+	return body, nil
 }
 
 func resolveURL(base *url.URL, ref string) string {
