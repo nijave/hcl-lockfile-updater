@@ -126,6 +126,22 @@ func mergePlain(data []byte, addr string, attrs ProviderAttrs) ([]byte, error) {
 		out = append(out, renderBlockPlain(addr, attrs)...)
 		return out, nil
 	}
+	needsInsertion := (attrs.Version != "" && blk.Body.Attributes["version"] == nil) ||
+		(attrs.Constraints != "" && blk.Body.Attributes["constraints"] == nil) ||
+		(len(attrs.Hashes) > 0 && blk.Body.Attributes["hashes"] == nil)
+	if needsInsertion && blk.OpenBraceRange.Start.Line == blk.CloseBraceRange.Start.Line && len(blk.Body.Attributes) > 0 {
+		// HCL requires a block with an argument on its header line to close on
+		// that same line. Expand it before adding another argument.
+		closeAt := int(blk.CloseBraceRange.Start.Byte)
+		openEnd := int(blk.OpenBraceRange.End.Byte)
+		data = append(append(append([]byte{}, data[:closeAt]...), '\n'), data[closeAt:]...)
+		data = append(append(append([]byte{}, data[:openEnd]...), '\n'), data[openEnd:]...)
+		var locateErr error
+		blk, locateErr = locateSyntaxBlock(data, addr)
+		if locateErr != nil {
+			return nil, fmt.Errorf("expanding provider block %q: %w", addr, locateErr)
+		}
+	}
 
 	set := map[string]string{}
 	if attrs.Version != "" {
@@ -181,7 +197,7 @@ func mergePlain(data []byte, addr string, attrs ProviderAttrs) ([]byte, error) {
 		if _, exists := blk.Body.Attributes[name]; exists {
 			continue
 		}
-		at := insertionPoint(data, blk, name)
+		at := insertionPoint(blk, name)
 		// Insert at the start of the line holding the insertion point,
 		// reusing that line's indent — the indent bytes are already there.
 		lineStart := at
@@ -189,9 +205,24 @@ func mergePlain(data []byte, addr string, attrs ProviderAttrs) ([]byte, error) {
 			lineStart--
 		}
 		indent := leadingIndent(data, at)
+		insertAt := lineStart
 		insert := indent + name + " = " + val + "\n"
-		data = append(append(append([]byte{}, data[:lineStart]...), insert...), data[lineStart:]...)
-		blk = locateSyntaxBlockIn(data, addr)
+		if !onlyIndent(data[lineStart:at]) {
+			// The target shares a line with the block header or another
+			// attribute. Start a new line inside the block instead of moving
+			// the new attribute ahead of the entire provider block.
+			insertAt = at
+			insert = "\n" + indent + name + " = " + val + "\n"
+			if at != int(blk.CloseBraceRange.Start.Byte) {
+				insert += indent
+			}
+		}
+		data = append(append(append([]byte{}, data[:insertAt]...), insert...), data[insertAt:]...)
+		nextBlock, locateErr := locateSyntaxBlock(data, addr)
+		if locateErr != nil {
+			return nil, fmt.Errorf("parsing provider block %q after edit: %w", addr, locateErr)
+		}
+		blk = nextBlock
 		if blk == nil {
 			return nil, fmt.Errorf("provider block %q vanished after edit", addr)
 		}
@@ -206,8 +237,14 @@ var canonicalAttrs = []string{"version", "constraints", "hashes"}
 // insertionPoint returns the byte offset where attr belongs: before the
 // first canonically-later existing attribute, or just before the closing
 // brace.
-func insertionPoint(data []byte, blk *hclsyntax.Block, attr string) int {
-	pos := sort.Search(len(canonicalAttrs), func(i int) bool { return canonicalAttrs[i] == attr })
+func insertionPoint(blk *hclsyntax.Block, attr string) int {
+	pos := 0
+	for pos < len(canonicalAttrs) && canonicalAttrs[pos] != attr {
+		pos++
+	}
+	if pos == len(canonicalAttrs) {
+		return int(blk.CloseBraceRange.Start.Byte)
+	}
 	later := canonicalAttrs[pos+1:]
 	for _, name := range later {
 		if a, ok := blk.Body.Attributes[name]; ok {
@@ -215,18 +252,6 @@ func insertionPoint(data []byte, blk *hclsyntax.Block, attr string) int {
 		}
 	}
 	return int(blk.CloseBraceRange.Start.Byte)
-}
-
-func locateSyntaxBlockIn(data []byte, addr string) *hclsyntax.Block {
-	f, diags := hclsyntax.ParseConfig(data, ".terraform.block.hcl", hcl.InitialPos)
-	if diags.HasErrors() {
-		return nil
-	}
-	body, ok := f.Body.(*hclsyntax.Body)
-	if !ok {
-		return nil
-	}
-	return findSyntaxProviderBlock(body, addr)
 }
 
 // formatBlockOnly runs the target block through the hcl formatter and splices
@@ -324,6 +349,15 @@ func leadingIndent(data []byte, offset int) string {
 		return "  "
 	}
 	return string(prefix)
+}
+
+func onlyIndent(prefix []byte) bool {
+	for _, b := range prefix {
+		if b != ' ' && b != '\t' {
+			return false
+		}
+	}
+	return true
 }
 
 func renderBlockPlain(addr string, attrs ProviderAttrs) string {

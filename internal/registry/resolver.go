@@ -2,6 +2,8 @@ package registry
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"sort"
 	"strings"
@@ -51,7 +53,11 @@ func (r *Resolver) Hashes(ctx context.Context, addr ProviderAddr, version string
 	if err != nil {
 		return nil, err
 	}
-	return dedupSort(hashes), nil
+	hashes = dedupSort(hashes)
+	if err := validateResolvedHashes(hashes); err != nil {
+		return nil, err
+	}
+	return hashes, nil
 }
 
 func (r *Resolver) fetch(ctx context.Context, addr ProviderAddr, version, firstPlatform string) (cachedHashes, error) {
@@ -74,7 +80,11 @@ func (r *Resolver) fetch(ctx context.Context, addr ProviderAddr, version, firstP
 	if err != nil {
 		return cachedHashes{}, err
 	}
-	return cachedHashes{shasumLines: ParseSHASUMSLines(body)}, nil
+	lines, err := ParseSHASUMSLines(body)
+	if err != nil {
+		return cachedHashes{}, fmt.Errorf("parsing SHASUMS: %w", err)
+	}
+	return cachedHashes{shasumLines: lines}, nil
 }
 
 func (c cachedHashes) hashesFor(platforms []string) ([]string, error) {
@@ -84,6 +94,9 @@ func (c cachedHashes) hashesFor(platforms []string) ([]string, error) {
 			hashes, ok := c.byPlatform[p]
 			if !ok {
 				return nil, fmt.Errorf("platform %q not present in registry packages response", p)
+			}
+			if len(hashes) == 0 {
+				return nil, fmt.Errorf("platform %q has no hashes in registry packages response", p)
 			}
 			out = append(out, hashes...)
 		}
@@ -103,6 +116,28 @@ func (c cachedHashes) hashesFor(platforms []string) ([]string, error) {
 		}
 	}
 	return out, nil
+}
+
+func validateResolvedHashes(hashes []string) error {
+	if len(hashes) == 0 {
+		return fmt.Errorf("registry returned no hashes")
+	}
+	for _, hash := range hashes {
+		switch {
+		case strings.HasPrefix(hash, "zh:"):
+			if !validSHA256Hex(strings.TrimPrefix(hash, "zh:")) {
+				return fmt.Errorf("registry returned invalid zh hash %q", hash)
+			}
+		case strings.HasPrefix(hash, "h1:"):
+			digest, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(hash, "h1:"))
+			if err != nil || len(digest) != sha256.Size {
+				return fmt.Errorf("registry returned invalid h1 hash %q", hash)
+			}
+		default:
+			return fmt.Errorf("registry returned unsupported hash %q", hash)
+		}
+	}
+	return nil
 }
 
 func splitPlatform(p string) (osName, arch string) {

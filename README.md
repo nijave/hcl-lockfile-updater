@@ -52,6 +52,8 @@ Verbatim mode applies a hand-written block:
 - The OpenTofu registry supplies `h1:` and `zh:` hashes directly (one call). For
   registries without that extension (the HashiCorp registry), the tool emits
   `zh:` hashes from the signed SHASUMS document only.
+- Registry and SHASUMS requests require HTTPS, including every redirect. Hashes
+  are validated before any lock file is written.
 - The tool queries the registry once per provider+version, even across many lock files.
 
 ## License

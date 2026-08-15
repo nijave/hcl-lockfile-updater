@@ -2,8 +2,12 @@ package lockfile
 
 import (
 	"bytes"
+	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
 )
 
 func TestRenderProviderBlock(t *testing.T) {
@@ -143,6 +147,62 @@ func TestMergeProviderBlockFormatOffPreservesForeignSpacing(t *testing.T) {
 	}
 }
 
+func TestMergeProviderBlockKeepsInsertedAttrsInsideInlineBlock(t *testing.T) {
+	addr := "a.example.com/x/y"
+	cases := map[string][]byte{
+		"existing attr": []byte(`provider "a.example.com/x/y" { version = "1.0.0" }`),
+		"empty block":   []byte(`provider "a.example.com/x/y" {}`),
+	}
+	for name, existing := range cases {
+		for _, format := range []Format{FormatOff, FormatBlock} {
+			t.Run(name+"/format="+strconv.Itoa(int(format)), func(t *testing.T) {
+				out, err := MergeProviderBlock(existing, addr, ProviderAttrs{
+					Version: "2.0.0",
+					Hashes:  []string{"zh:aaaa"},
+				}, format)
+				if err != nil {
+					t.Fatalf("MergeProviderBlock: %v", err)
+				}
+				file, diags := hclsyntax.ParseConfig(out, ".terraform.lock.hcl", hcl.InitialPos)
+				if diags.HasErrors() {
+					t.Fatalf("output is invalid HCL: %v\n%s", diags, out)
+				}
+				body := file.Body.(*hclsyntax.Body)
+				if _, exists := body.Attributes["version"]; exists {
+					t.Fatalf("version inserted at top level:\n%s", out)
+				}
+				if _, exists := body.Attributes["hashes"]; exists {
+					t.Fatalf("hashes inserted at top level:\n%s", out)
+				}
+				if !strings.Contains(string(out), `"2.0.0"`) || strings.Contains(string(out), `"1.0.0"`) {
+					t.Errorf("provider version not updated:\n%s", out)
+				}
+				block := findSyntaxProviderBlock(body, addr)
+				if block == nil {
+					t.Fatalf("provider block missing:\n%s", out)
+				}
+				for _, attr := range []string{"version", "hashes"} {
+					if _, exists := block.Body.Attributes[attr]; !exists {
+						t.Errorf("provider block missing %s:\n%s", attr, out)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestMergeProviderBlockFormatOffKeepsInlineBlockWithoutInsertion(t *testing.T) {
+	existing := []byte(`provider "a.example.com/x/y" { version = "1.0.0" }`)
+	out, err := MergeProviderBlock(existing, "a.example.com/x/y", ProviderAttrs{Version: "2.0.0"}, FormatOff)
+	if err != nil {
+		t.Fatalf("MergeProviderBlock: %v", err)
+	}
+	want := `provider "a.example.com/x/y" { version = "2.0.0" }`
+	if string(out) != want {
+		t.Errorf("inline block changed unnecessarily:\nwant: %s\ngot:  %s", want, out)
+	}
+}
+
 func TestMergeProviderBlockFormatFileReformatsEverything(t *testing.T) {
 	existing := []byte(`provider "a.example.com/x/keep" {
     version = "1.0.0"
@@ -213,7 +273,7 @@ func TestRenderProviderBlockPlain(t *testing.T) {
 			Version: "1.0.0",
 			Hashes:  []string{"h1:aaa="},
 		}, format)
-		if bytes.Equal(got, out[:len(out)]) {
+		if bytes.Equal(got, out) {
 			t.Errorf("format %v: expected hclwrite rendering, got plain", format)
 		}
 		if !strings.Contains(string(got), `hashes  = ["h1:aaa="]`) {

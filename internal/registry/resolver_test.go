@@ -95,6 +95,36 @@ func TestResolverPackagesMissingPlatformErrors(t *testing.T) {
 	}
 }
 
+func TestCachedHashesRejectsEmptyPlatformHashes(t *testing.T) {
+	cached := cachedHashes{byPlatform: map[string][]string{"linux_amd64": {}}}
+	_, err := cached.hashesFor([]string{"linux_amd64"})
+	if err == nil || !strings.Contains(err.Error(), "no hashes") {
+		t.Fatalf("error = %v, want empty hash rejection", err)
+	}
+}
+
+func TestValidateResolvedHashes(t *testing.T) {
+	validH1 := "h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+	if err := validateResolvedHashes([]string{"zh:" + testDigestA, validH1}); err != nil {
+		t.Fatalf("valid hashes rejected: %v", err)
+	}
+	tests := map[string][]string{
+		"empty":              {},
+		"short zh":           {"zh:aaaa"},
+		"uppercase zh":       {"zh:" + strings.ToUpper(testDigestA)},
+		"invalid h1 base64":  {"h1:not-base64"},
+		"wrong h1 length":    {"h1:YQ=="},
+		"unsupported scheme": {"future:" + testDigestA},
+	}
+	for name, hashes := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := validateResolvedHashes(hashes); err == nil {
+				t.Fatal("expected error")
+			}
+		})
+	}
+}
+
 // A platform with no line in the SHASUMS document must error for the same
 // reason.
 func TestResolverSHASUMSMissingPlatformErrors(t *testing.T) {
@@ -149,8 +179,8 @@ func TestResolverSHASUMS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := []string{"zh:aaaa"}
-	if len(got) != 1 || got[0] != "zh:aaaa" {
+	want := []string{"zh:" + testDigestA}
+	if len(got) != 1 || got[0] != "zh:"+testDigestA {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }

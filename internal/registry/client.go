@@ -3,10 +3,12 @@ package registry
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -26,6 +28,51 @@ func NewClient(hc *http.Client) *Client {
 		hc = &http.Client{Timeout: defaultTimeout}
 	}
 	return &Client{httpClient: hc}
+}
+
+func (c *Client) do(req *http.Request) (*http.Response, error) {
+	if !isHTTPS(req.URL) {
+		return nil, errors.New("refusing non-HTTPS registry URL")
+	}
+	hc := *c.httpClient
+	originalCheckRedirect := hc.CheckRedirect
+	hc.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if !isHTTPS(next.URL) {
+			return errors.New("refusing redirect to non-HTTPS registry URL")
+		}
+		if originalCheckRedirect != nil {
+			return originalCheckRedirect(next, via)
+		}
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		return nil
+	}
+	return hc.Do(req)
+}
+
+func isHTTPS(u *url.URL) bool {
+	return u != nil && strings.EqualFold(u.Scheme, "https") && u.Host != ""
+}
+
+func displayURL(u *url.URL) string {
+	if u == nil {
+		return "<invalid URL>"
+	}
+	clean := *u
+	clean.User = nil
+	clean.RawQuery = ""
+	clean.ForceQuery = false
+	clean.Fragment = ""
+	return clean.String()
+}
+
+func requestError(action string, u *url.URL, err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return fmt.Errorf("%s %s: %s: %w", action, displayURL(u), urlErr.Op, urlErr.Err)
+	}
+	return fmt.Errorf("%s %s: %w", action, displayURL(u), err)
 }
 
 // Platform represents one os/arch pair published for a version.
@@ -72,9 +119,9 @@ func (c *Client) ListVersions(ctx context.Context, addr ProviderAddr) ([]Version
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
-		return nil, err
+		return nil, requestError("querying registry", req.URL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -119,9 +166,9 @@ func (c *Client) PackageMeta(ctx context.Context, addr ProviderAddr, version, os
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.do(req)
 	if err != nil {
-		return nil, err
+		return nil, requestError("querying package metadata", req.URL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -149,24 +196,31 @@ const maxSHASUMSSize = 1 << 20
 // lock` applies. Same-origin pinning would reject legitimate hosts (the
 // download endpoint redirects to a release CDN before this URL is resolved).
 func (c *Client) FetchSHASUMS(ctx context.Context, urlStr string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	u, err := url.Parse(urlStr)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("registry returned an invalid SHASUMS URL")
 	}
-	resp, err := c.httpClient.Do(req)
+	if !isHTTPS(u) {
+		return nil, fmt.Errorf("refusing non-HTTPS SHASUMS URL %s", displayURL(u))
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating SHASUMS request: %w", err)
+	}
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, requestError("fetching SHASUMS", req.URL, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("fetching shasums %s: %s", urlStr, resp.Status)
+		return nil, fmt.Errorf("fetching SHASUMS %s: %s", displayURL(resp.Request.URL), resp.Status)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxSHASUMSSize+1))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading SHASUMS %s: %w", displayURL(resp.Request.URL), err)
 	}
 	if len(body) > maxSHASUMSSize {
-		return nil, fmt.Errorf("shasums document %s exceeds %d bytes", urlStr, maxSHASUMSSize)
+		return nil, fmt.Errorf("SHASUMS document %s exceeds %d bytes", displayURL(resp.Request.URL), maxSHASUMSSize)
 	}
 	return body, nil
 }

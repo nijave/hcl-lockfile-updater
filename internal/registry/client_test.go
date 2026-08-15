@@ -5,9 +5,11 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -35,6 +37,70 @@ func TestFetchSHASUMSRejectsOversizedBody(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "exceeds") {
 		t.Errorf("error should name the size violation: %v", err)
+	}
+}
+
+func TestFetchSHASUMSRejectsHTTP(t *testing.T) {
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.Write([]byte("unexpected"))
+	}))
+	defer srv.Close()
+
+	_, err := NewClient(srv.Client()).FetchSHASUMS(context.Background(), srv.URL)
+	if err == nil || !strings.Contains(err.Error(), "non-HTTPS") {
+		t.Fatalf("error = %v, want non-HTTPS rejection", err)
+	}
+	if hits.Load() != 0 {
+		t.Fatalf("HTTP server received %d requests, want 0", hits.Load())
+	}
+}
+
+func TestFetchSHASUMSRejectsHTTPSDowngrade(t *testing.T) {
+	var insecureHits atomic.Int32
+	insecure := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		insecureHits.Add(1)
+		w.Write([]byte("unexpected"))
+	}))
+	defer insecure.Close()
+
+	secure := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, insecure.URL, http.StatusFound)
+	}))
+	defer secure.Close()
+
+	_, err := NewClient(secure.Client()).FetchSHASUMS(context.Background(), secure.URL)
+	if err == nil || !strings.Contains(err.Error(), "non-HTTPS") {
+		t.Fatalf("error = %v, want downgrade rejection", err)
+	}
+	if insecureHits.Load() != 0 {
+		t.Fatalf("downgrade target received %d requests, want 0", insecureHits.Load())
+	}
+}
+
+func TestFetchSHASUMSErrorRedactsURLCredentials(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	u, err := url.Parse(srv.URL + "/SHA256SUMS?token=top-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.User = url.UserPassword("registry-user", "registry-password")
+	_, err = NewClient(srv.Client()).FetchSHASUMS(context.Background(), u.String())
+	if err == nil {
+		t.Fatal("expected HTTP error")
+	}
+	for _, secret := range []string{"top-secret", "registry-user", "registry-password", "token="} {
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("error exposes %q: %v", secret, err)
+		}
+	}
+	if !strings.Contains(err.Error(), "/SHA256SUMS") {
+		t.Errorf("error lost useful path context: %v", err)
 	}
 }
 

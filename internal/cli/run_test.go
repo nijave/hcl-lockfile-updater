@@ -39,7 +39,7 @@ func TestRunLookupWritesLockFile(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"filename":"x.zip","shasums_url":"https://releases.example.com/SHA256SUMS","packages":{"linux_amd64":{"hashes":["zh:aaa","h1:bbb="]}}}`),
+		[]byte(`{"filename":"x.zip","shasums_url":"https://releases.example.com/SHA256SUMS","packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -78,7 +78,7 @@ func TestRunLookupCacheHitsOnceAcrossFiles(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"shasums_url":"https://releases.example.com/SHA256SUMS","packages":{"linux_amd64":{"hashes":["zh:aaa"]}}}`),
+		[]byte(`{"shasums_url":"https://releases.example.com/SHA256SUMS","packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -104,7 +104,7 @@ func TestRunPrintBlock(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa","h1:bbb="]}}}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -138,7 +138,7 @@ func TestRunPrintBlockLeavesLockFileUnchanged(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa","h1:bbb="]}}}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -241,7 +241,7 @@ func TestRunLookupCreatesMissingLockFile(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"filename":"x.zip","packages":{"linux_amd64":{"hashes":["zh:aaa","h1:bbb="]}}}`),
+		[]byte(`{"filename":"x.zip","packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -275,7 +275,7 @@ func TestRunLookupReadErrorPropagates(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"filename":"x.zip","packages":{"linux_amd64":{"hashes":["zh:aaa"]}}}`),
+		[]byte(`{"filename":"x.zip","packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -390,7 +390,7 @@ func TestRunLookupFormatOffPreservesFile(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa","h1:bbb="]}}}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -410,7 +410,7 @@ func TestRunLookupFormatOffPreservesFile(t *testing.T) {
 	}
 	got, _ := os.ReadFile(lockPath)
 	// The resolver dedup-sorts hashes, so expect its sorted order.
-	want := "# managed by tooling\nprovider \"" + addr.String() + "\" {\n  version = \"6.0.0\"\n  constraints   =   \"~> 5.0\"\n  hashes = [\"h1:bbb=\", \"zh:aaa\"]\n}\n"
+	want := "# managed by tooling\nprovider \"" + addr.String() + "\" {\n  version = \"6.0.0\"\n  constraints   =   \"~> 5.0\"\n  hashes = [\"h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\", \"zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"]\n}\n"
 	if string(got) != want {
 		t.Errorf("format-off file wrong.\nwant:\n%s\ngot:\n%s", want, string(got))
 	}
@@ -420,7 +420,7 @@ func TestRunLookupReformatReformatsFile(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa"]}}}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
@@ -439,7 +439,7 @@ func TestRunLookupReformatReformatsFile(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got, _ := os.ReadFile(lockPath)
-	want := "# managed by tooling\nprovider \"" + addr.String() + "\" {\n  version     = \"6.0.0\"\n  constraints = \"~> 5.0\"\n  hashes      = [\"zh:aaa\"]\n}\n"
+	want := "# managed by tooling\nprovider \"" + addr.String() + "\" {\n  version     = \"6.0.0\"\n  constraints = \"~> 5.0\"\n  hashes      = [\"zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"]\n}\n"
 	if string(got) != want {
 		t.Errorf("reformat file wrong.\nwant:\n%s\ngot:\n%s", want, string(got))
 	}
@@ -449,7 +449,7 @@ func TestRunLookupSkipMissing(t *testing.T) {
 	var metaHits int32
 	srv := newRegServer(t,
 		[]byte(`{"versions":[{"version":"6.0.0","platforms":[{"os":"linux","arch":"amd64"}]}]}`),
-		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaa"]}}}`),
+		[]byte(`{"packages":{"linux_amd64":{"hashes":["zh:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]}}}`),
 		nil, &metaHits)
 	addr := registry.ProviderAddr{Host: srv.Listener.Addr().String(), Namespace: "hashicorp", Type: "aws"}
 	client := registry.NewClient(srv.Client())
