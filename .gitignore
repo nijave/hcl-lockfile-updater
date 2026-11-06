@@ -4,3 +4,4 @@
 /hcl-lockfile-updater.exe
 *.out
 *.test
+dist/
