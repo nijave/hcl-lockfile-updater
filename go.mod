@@ -4,7 +4,7 @@ go 1.25.12
 
 require (
 	github.com/hashicorp/go-version v1.9.0
-	github.com/spf13/pflag v1.0.10
+	github.com/spf13/pflag v1.1.0
 	github.com/zclconf/go-cty v1.19.0
 )
 
