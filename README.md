@@ -8,6 +8,10 @@ arguments instead of a configuration tree.
 
     go install github.com/nijave/hcl-lockfile-updater@latest
 
+Prebuilt binaries for Linux, macOS, and Windows (amd64 and arm64) are attached
+to each [release](https://github.com/nijave/hcl-lockfile-updater/releases), along
+with a `checksums.txt`.
+
 ## Usage
 
     hcl-lockfile-updater [--block-file FILE | PROVIDER_SOURCE] [flags] LOCKFILE...
